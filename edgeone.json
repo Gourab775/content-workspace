@@ -8,7 +8,11 @@
     }
   },
   "agents": {
-    "framework": "langgraph",
+    "framework": "workflow",
+    "externalNodeModules": ["@langchain/openai", "@langchain/core", "deepagents", "langchain"]
+  },
+  "services": {
+    "framework": "workflow",
     "externalNodeModules": ["@langchain/openai", "@langchain/core", "deepagents", "langchain"]
   }
 }
