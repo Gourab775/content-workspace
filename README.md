@@ -83,8 +83,8 @@ cp .env.example .env
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `SERVICE_API_KEY` | Yes | Platform gateway API key (OpenAI-compatible). |
-| `SERVICE_BASE_URL` | Yes | Gateway base URL, e.g. `https://ai-gateway.edgeone.link/v1` |
+| `SERVICE_API_KEY` | Yes | Platform gateway API key (platform-compatible). |
+| `SERVICE_BASE_URL` | Yes | Gateway base URL, e.g. `https://gateway.edgeone.link/v1` |
 | `SERVICE_MODEL` | No | Model identifier. Defaults to `@makers/deepseek-v4-flash` |
 | `WSA_API_KEY` | No | Search provider key for background research |
 
