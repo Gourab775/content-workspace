@@ -1,117 +1,140 @@
-# Content Creator Agent
+# Content Creator Studio
 
-AI-driven content creation assistant that researches topics, generates structured outlines, and writes streaming articles with SEO analysis, version management, and persistent memory. Built on Deep Agents and deployed on EdgeOne Makers.
+Professional full-stack workspace for research-driven content development, structured outlining, streaming publishing, and search optimization with persistent preferences and versioned history.
 
-**Framework:** Deep Agents · **Category:** Content · **Language:** TypeScript
+**Live Demo:** https://gourab775.github.io/content-creator-agent
 
-[![Deploy to EdgeOne Makers](https://cdnstatic.tencentcs.com/edgeone/pages/deploy.svg)](https://edgeone.ai/makers/new?template=content-creator-agent&from=within&fromAgent=1&agentLang=typescript)
+**Category:** Content & Publishing
+
+**Stack:** Next.js 16 · TypeScript · Workflow Engine · State Workflow · Platform Services
 
 ## Overview
 
-This template orchestrates a full content creation pipeline — from topic research to polished article — through a multi-stage agent workflow. It uses LangChain-powered agents with structured prompts, accumulates user preferences across sessions, and stores article versions for retrieval and comparison.
+Content Creator Studio orchestrates a complete editorial workflow — from topic discovery to polished publication — through a multi-stage service pipeline. The workspace integrates background research, hierarchical outlining, and streaming document generation with style-aware preferences, search optimization tools, and versioned storage for reliable editorial operations at scale.
 
-- **Topic Research** — Optionally searches the web once per request for background material before writing.
-- **Structured Outlining** — Generates a hierarchical outline with `##` sections and `###` subsections before drafting.
-- **Streaming Article Writing** — Produces the full article in a single streaming run with word-count targets and style adherence.
-- **SEO & Keyword Tools** — Dedicated endpoints for SEO optimization and keyword suggestions.
-- **Persistent Memory** — Tracks user preferences (style, length, tone, recent topics) across articles via conversation-scoped message storage.
-- **Version Management** — Saves each generated article as a versioned record with title, content, and metadata.
+Built for teams and individual creators who need enterprise-grade reliability, extensibility, and deployment readiness on modern full-stack infrastructure.
 
-## Environment Variables
+## Features
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `AI_GATEWAY_API_KEY` | Yes | Model gateway API key. Use your Makers Models API Key, or any OpenAI-compatible provider key. |
-| `AI_GATEWAY_BASE_URL` | Yes | Gateway base URL. For Makers Models, use `https://ai-gateway.edgeone.link/v1`. |
-| `AI_GATEWAY_MODEL` | No | Model ID. Defaults to `@makers/deepseek-v4-flash`. |
+- **Topic Research Service** — Gathers background material once per request to inform outline and draft quality.
+- **Structured Outlining** — Generates hierarchical outlines with primary and secondary sections tailored to target length and tone.
+- **Streaming Document Generation** — Produces complete articles in a single streaming run with word-count targets and style adherence.
+- **Search Optimization & Keyword Tools** — Dedicated services for on-page optimization and keyword recommendations.
+- **Persistent Preferences & Version History** — Tracks user preferences (style, length, tone, recent topics) across sessions and stores each publication as a versioned record.
 
-This template follows the OpenAI-compatible standard — point these at Makers Models or any compatible provider.
+## Tech Stack
 
-### How to get AI_GATEWAY_API_KEY
-
-1. Open the Makers Console (https://edgeone.ai/makers/new?s_url=https://console.tencentcloud.com/edgeone/makers)
-2. Sign in and enable Makers
-3. Go to Makers → Models → API Key and create a key
-4. Copy it into `AI_GATEWAY_API_KEY`
-
-> Built-in models are free within quota and great for validation. For production, bind your own paid provider key (BYOK).
-
-## Local Development
-
-**Prerequisites**
-- Node.js 18+
-- EdgeOne CLI (`npm i -g edgeone`)
-
-```bash
-npm install
-cp .env.example .env
-# Edit .env with your AI_GATEWAY_API_KEY and AI_GATEWAY_BASE_URL
-edgeone makers dev
-```
-
-Open the local observability dashboard at http://localhost:8088/agent-metrics.
+| Layer | Technology |
+|-------|------------|
+| Frontend | Next.js 16, React 19, Tailwind CSS, TypeScript |
+| Workflow | Workflow Engine, State Workflow |
+| Services | Platform Services (model gateway, search integration) |
+| Persistence | Cloud Functions (articles, preferences), message-scoped storage |
+| Deployment | EdgeOne / GitHub Pages, Node.js 18+ |
 
 ## Project Structure
 
 ```
 content-creator-agent/
-├── agents/
-│   ├── create.ts           # POST /create — full article creation with memory
+├── services/
+│   ├── create.ts           # POST /create — full publication with preferences
 │   ├── create-lite.ts      # POST /create-lite — lightweight mode
 │   ├── outline.ts          # POST /outline — structured outline generation
-│   ├── refine.ts           # POST /refine — article polishing
+│   ├── refine.ts           # POST /refine — document polishing
 │   ├── research.ts         # POST /research — topic background research
-│   ├── optimize.ts         # POST /optimize — SEO optimization
+│   ├── optimize.ts         # POST /optimize — search optimization
 │   ├── suggest-keywords.ts # POST /suggest-keywords
-│   ├── test.ts             # POST /test
 │   ├── stop.ts             # POST /stop — abort active run
 │   └── _shared.ts          # Model init, env validation, SSE helpers
 ├── cloud-functions/
-│   ├── articles/           # Article version persistence
+│   ├── articles/           # Versioned article persistence
 │   ├── preferences/        # User preference storage
 │   ├── health/             # GET /health
 │   └── _logger.ts
 ├── app/                    # Next.js App Router frontend
 ├── lib/
-│   └── i18n.tsx            # Chinese / English translations
-└── edgeone.json            # EdgeOne deployment config
+│   └── i18n.tsx            # Internationalization (EN / ZH)
+├── components/             # Reusable UI components
+└── edgeone.json            # Deployment configuration
 ```
 
-Files prefixed with `_` are private modules — not exposed as public routes.
+> `services/` corresponds to the former `agents/` directory and is used as the canonical service folder throughout this workspace.
 
-## How It Works
+## Getting Started
 
-### Runtime Mode
-Files under `agents/` run in **session mode**: requests with the same `conversation_id` are sticky-routed to the same agent instance. This ensures user memory and conversation context persist across follow-up messages.
+### Prerequisites
 
-### End-to-End Workflow
+- Node.js 18+
+- npm or bun
 
-1. **Input collection** — The frontend POSTs `/create` with topic, keywords, style, length, and optional reference material.
-2. **Memory load** — The agent loads previously stored user preferences (style, tone, avoid-patterns) from conversation-scoped message storage.
-3. **Research (optional)** — If enabled, a single web search is executed via the platform `web_search` tool to gather background material.
-4. **Outline generation** — An outline agent produces a structured hierarchy (`##` sections with `###` subsections) tailored to the requested length.
-5. **Article drafting** — The create agent streams the full article in one run, respecting the outline, word-count target, and loaded user preferences.
-6. **Post-processing** — The article can be refined (`/refine`), SEO-optimized (`/optimize`), or keyword-analyzed (`/suggest-keywords`) in separate calls.
-7. **Persistence** — The final article is saved as a versioned record via `cloud-functions/articles/`; user preferences are updated via `cloud-functions/preferences/`.
+### Installation
 
-### Key Routes & Parameters
-- `/create` — Full article creation. Body: `{ topic, keywords, style, length, language }`.
-- `/create-lite` — Lightweight mode with fewer parameters.
-- `/outline` — Generates an outline only.
-- `/refine` — Polishes an existing article.
-- `/optimize` — SEO analysis and suggestions.
-- `/suggest-keywords` — Keyword recommendations.
-- `/stop` — Aborts the active run. Body: `{ conversation_id }`.
-- `conversation_id` is generated client-side and forwarded via the `makers-conversation-id` header; the runtime auto-binds it to `context.conversation_id`.
+```bash
+npm install
+```
 
-### Timeouts
-No custom agent timeout is configured in `edgeone.json`; the platform default applies. The model client uses a 300-second internal timeout.
+### Environment Variables
 
-## Resources
+Create a `.env` file from the example:
 
-- [Makers Agents Documentation](https://pages.edgeone.ai/document/agents)
-- [Makers Quick Start](https://pages.edgeone.ai/document/agents-quick-start)
-- [Makers Models](https://pages.edgeone.ai/document/models)
+```bash
+cp .env.example .env
+```
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `SERVICE_API_KEY` | Yes | Platform gateway API key (OpenAI-compatible). |
+| `SERVICE_BASE_URL` | Yes | Gateway base URL, e.g. `https://ai-gateway.edgeone.link/v1` |
+| `SERVICE_MODEL` | No | Model identifier. Defaults to `@makers/deepseek-v4-flash` |
+| `WSA_API_KEY` | No | Search provider key for background research |
+
+> Note: `SERVICE_*` is an alias for `AI_GATEWAY_*` for backward compatibility.
+
+### Development
+
+```bash
+npm run dev
+# or with EdgeOne CLI
+# edgeone makers dev
+```
+
+Open http://localhost:3000
+
+Observability dashboard (when using EdgeOne CLI): http://localhost:8088/agent-metrics
+
+### Build
+
+```bash
+npm run build
+npm start
+```
+
+## Deployment
+
+### EdgeOne Makers
+
+Configured via `edgeone.json`:
+
+- `buildCommand`: `npm run build`
+- `outputDirectory`: `.next`
+- `framework`: `nextjs`
+- `services.framework`: `workflow`
+
+Deploy via EdgeOne console or CLI. Bind `SERVICE_*` variables in the deployment environment.
+
+### GitHub Pages / Static Hosting
+
+The frontend is a standard Next.js application. For static export, configure `next.config.mjs` accordingly and deploy the build output to GitHub Pages or any Node-compatible host.
+
+Live Demo deployment: https://gourab775.github.io/content-creator-agent
+
+## Customization
+
+- **Styling:** Tailwind configuration in `tailwind.config.ts` and global styles in `app/globals.css`. Update theme tokens and component styles to match brand guidelines.
+- **Workflow Logic:** Service handlers in `services/` define request validation, research, outlining, and generation steps. Extend or replace handlers to add new endpoints.
+- **Persistence:** Cloud functions under `cloud-functions/` manage versioning and preferences. Swap adapters to integrate external databases or CMS platforms.
+- **Internationalization:** Edit `lib/i18n.tsx` to add locales or adjust copy.
+- **Search Integration:** Configure `WSA_API_KEY` or replace the search provider in `services/_shared.ts`.
 
 ## License
 
