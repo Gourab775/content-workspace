@@ -2,6 +2,7 @@
   "name": "content-creator-agent",
   "private": true,
   "version": "0.1.0",
+  "description": "Professional content creation workspace with research, structured outlining, streaming publishing, and search optimization workflows.",
   "type": "module",
   "scripts": {
     "dev": "next dev",
