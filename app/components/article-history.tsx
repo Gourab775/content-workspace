@@ -34,6 +34,48 @@ interface ArticleHistoryProps {
   onSaveError?: (message: string) => void;
 }
 
+// — Cache (stale-while-revalidate, 5 min TTL) —
+const CACHE_KEY = 'content-workspace:articles:v1';
+const CACHE_TS_KEY = 'content-workspace:articles:ts:v1';
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+function isBrowser(): boolean {
+  return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+}
+
+function readCache(): { data: ArticleRecord[]; ts: number } | null {
+  if (!isBrowser()) return null;
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    const tsRaw = localStorage.getItem(CACHE_TS_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as ArticleRecord[];
+    const ts = tsRaw ? Number(tsRaw) : 0;
+    if (!Array.isArray(data)) return null;
+    // expired?
+    if (Date.now() - ts > CACHE_TTL_MS) return null;
+    return { data, ts };
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(articles: ArticleRecord[]) {
+  if (!isBrowser()) return;
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(articles));
+    localStorage.setItem(CACHE_TS_KEY, String(Date.now()));
+  } catch {}
+}
+
+function clearCache() {
+  if (!isBrowser()) return;
+  try {
+    localStorage.removeItem(CACHE_KEY);
+    localStorage.removeItem(CACHE_TS_KEY);
+  } catch {}
+}
+
 export function ArticleHistory({
   onLoadArticle,
   currentContent,
@@ -49,8 +91,12 @@ export function ArticleHistory({
   const [isLoading, setIsLoading] = useState(true);
   const [savedToast, setSavedToast] = useState(false);
   const [blobError, setBlobError] = useState<string | null>(null);
+  const [isRevalidating, setIsRevalidating] = useState(false);
 
-  const fetchArticles = useCallback(async () => {
+  const fetchArticles = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent ?? false;
+    if (!silent) setIsLoading(true);
+    else setIsRevalidating(true);
     try {
       const res = await fetch('/articles', {
         method: 'POST',
@@ -61,19 +107,41 @@ export function ArticleHistory({
       if (!res.ok || data?.error === 'BLOB_NOT_CONFIGURED') {
         setBlobError('BLOB_NOT_CONFIGURED');
         setArticles([]);
+        clearCache();
       } else {
         setBlobError(null);
-        setArticles(data?.articles || []);
+        const list: ArticleRecord[] = data?.articles || [];
+        setArticles(list);
+        writeCache(list);
       }
     } catch {
-      // silently fail
+      // network error: keep cache if we have it
+      if (!silent && articles.length === 0) {
+        const cached = readCache();
+        if (cached) setArticles(cached.data);
+      }
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
+      setIsRevalidating(false);
     }
   }, []);
 
+  // Initial hydrate: try cache first (instant), then revalidate in background
   useEffect(() => {
-    fetchArticles();
+    const cached = readCache();
+    if (cached && cached.data.length > 0) {
+      setArticles(cached.data);
+      setIsLoading(false);
+      // background refresh without flicker
+      fetchArticles({ silent: true });
+    } else if (cached && cached.data.length === 0) {
+      // empty cache but still recent — show empty fast, then revalidate
+      setArticles([]);
+      setIsLoading(false);
+      fetchArticles({ silent: true });
+    } else {
+      fetchArticles();
+    }
   }, [fetchArticles]);
 
   // Auto-save: create new article or add version to existing
@@ -97,6 +165,7 @@ export function ArticleHistory({
               const errData = await res.json().catch(() => null);
               if (errData?.error === 'BLOB_NOT_CONFIGURED') {
                 setBlobError('BLOB_NOT_CONFIGURED');
+                clearCache();
               } else {
                 onSaveError?.(errData?.message || `Save failed (${res.status})`);
               }
@@ -107,13 +176,14 @@ export function ArticleHistory({
             const data = await res.json();
             if (data.error === 'BLOB_NOT_CONFIGURED') {
               setBlobError('BLOB_NOT_CONFIGURED');
+              clearCache();
               onAutoSaved(currentArticleId, []);
               return;
             }
 
             setSavedToast(true);
             setTimeout(() => setSavedToast(false), 2000);
-            await fetchArticles();
+            await fetchArticles({ silent: true });
 
             const articleRes = await fetch('/articles', {
               method: 'POST',
@@ -140,6 +210,7 @@ export function ArticleHistory({
               const errData = await res.json().catch(() => null);
               if (errData?.error === 'BLOB_NOT_CONFIGURED') {
                 setBlobError('BLOB_NOT_CONFIGURED');
+                clearCache();
               } else {
                 onSaveError?.(errData?.message || `Save failed (${res.status})`);
               }
@@ -150,17 +221,17 @@ export function ArticleHistory({
             const data = await res.json();
             if (data.error === 'BLOB_NOT_CONFIGURED') {
               setBlobError('BLOB_NOT_CONFIGURED');
+              clearCache();
               onAutoSaved('', []);
               return;
             }
 
             setSavedToast(true);
             setTimeout(() => setSavedToast(false), 2000);
-            await fetchArticles();
+            await fetchArticles({ silent: true });
 
-            const chinese = (currentContent.match(/[\u4e00-\u9fff]/g) || []).length;
-            const english = currentContent.replace(/[\u4e00-\u9fff]/g, '').split(/\s+/).filter(Boolean).length;
-            const wordCount = chinese + english;
+            // English-only word count
+            const wordCount = currentContent.split(/\s+/).filter(Boolean).length;
             onAutoSaved(data.id, [{ content: currentContent, createdAt: new Date().toISOString(), wordCount }]);
           }
         } catch (err) {
@@ -173,21 +244,28 @@ export function ArticleHistory({
     }, 200);
 
     return () => clearTimeout(timer);
-  }, [shouldAutoSave, currentContent, currentKeywords, currentStyle, onAutoSaved, fetchArticles, currentArticleId]);
+  }, [shouldAutoSave, currentContent, currentKeywords, currentStyle, onAutoSaved, fetchArticles, currentArticleId, onSaveError]);
 
   const handleDelete = useCallback(
     async (id: string, e: React.MouseEvent) => {
       e.stopPropagation();
+      // optimistic cache + UI update
+      setArticles((prev) => {
+        const next = prev.filter((a) => a.id !== id);
+        writeCache(next);
+        return next;
+      });
       try {
         await fetch('/articles', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'delete', id }),
         });
-        setArticles((prev) => prev.filter((a) => a.id !== id));
+        // revalidate to ensure consistency
+        fetchArticles({ silent: true });
       } catch {}
     },
-    []
+    [fetchArticles]
   );
 
   const handleLoad = useCallback(
@@ -200,6 +278,10 @@ export function ArticleHistory({
     },
     [onLoadArticle]
   );
+
+  const handleManualRefresh = useCallback(() => {
+    fetchArticles();
+  }, [fetchArticles]);
 
   return (
     <Card>
@@ -215,7 +297,20 @@ export function ArticleHistory({
                 {articles.length}
               </span>
             )}
+            {isRevalidating && !isLoading && (
+              <span className="inline-flex h-1.5 w-1.5 rounded-full bg-brand-400 animate-pulse" aria-label="syncing" />
+            )}
           </h2>
+          <button
+            onClick={handleManualRefresh}
+            aria-label="Refresh history"
+            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 text-xs"
+            title="Refresh from server (cache 5 min)"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
         </div>
       </CardHeader>
 
@@ -232,10 +327,12 @@ export function ArticleHistory({
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
+            <span className="text-xs text-gray-400">Loading…</span>
           </div>
         ) : blobError ? (
           <div className="py-4 px-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
             <p className="text-xs font-medium text-amber-700 dark:text-amber-400">{t.blobNotConfigured}</p>
+            <p className="text-[11px] text-amber-600/80 dark:text-amber-400/70 mt-1">History is cached locally for this session and will sync when storage is available.</p>
           </div>
         ) : articles.length === 0 ? (
           <p className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">{t.noHistory}</p>
@@ -264,7 +361,7 @@ export function ArticleHistory({
                     <div className="mt-1 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                       <span>{new Date(article.createdAt).toLocaleDateString()}</span>
                       <span>&middot;</span>
-                      <span>{article.wordCount} {t.characters}</span>
+                      <span>{article.wordCount} {t.wordCount}</span>
                       {article.versions && article.versions.length > 1 && (
                         <>
                           <span>&middot;</span>
@@ -288,6 +385,10 @@ export function ArticleHistory({
               </li>
             ))}
           </ul>
+        )}
+        {/* subtle cache hint */}
+        {!isLoading && !blobError && articles.length > 0 && (
+          <p className="mt-2 text-center text-[10px] text-gray-400 dark:text-gray-500">Cached locally · refreshes every 5 min</p>
         )}
       </CardContent>
     </Card>
