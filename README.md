@@ -1,26 +1,26 @@
-# Content Creator Studio
+﻿# Content Creator Studio
 
 Professional full-stack workspace for research-driven content development, structured outlining, streaming publishing, and search optimization with persistent preferences and versioned history.
 
-**Live Demo:** https://gourab775.github.io/content-creator-agent
+**Live Demo:** https://content-creator-agent-tawny.vercel.app
 
 **Category:** Content & Publishing
 
-**Stack:** Next.js 16 · TypeScript · Workflow Engine · State Workflow · Platform Services
+**Stack:** Next.js 16 Â· TypeScript Â· Workflow Engine Â· State Workflow Â· Platform Services
 
 ## Overview
 
-Content Creator Studio orchestrates a complete editorial workflow — from topic discovery to polished publication — through a multi-stage service pipeline. The workspace integrates background research, hierarchical outlining, and streaming document generation with style-aware preferences, search optimization tools, and versioned storage for reliable editorial operations at scale.
+Content Creator Studio orchestrates a complete editorial workflow â€” from topic discovery to polished publication â€” through a multi-stage service pipeline. The workspace integrates background research, hierarchical outlining, and streaming document generation with style-aware preferences, search optimization tools, and versioned storage for reliable editorial operations at scale.
 
 Built for teams and individual creators who need enterprise-grade reliability, extensibility, and deployment readiness on modern full-stack infrastructure.
 
 ## Features
 
-- **Topic Research Service** — Gathers background material once per request to inform outline and draft quality.
-- **Structured Outlining** — Generates hierarchical outlines with primary and secondary sections tailored to target length and tone.
-- **Streaming Document Generation** — Produces complete articles in a single streaming run with word-count targets and style adherence.
-- **Search Optimization & Keyword Tools** — Dedicated services for on-page optimization and keyword recommendations.
-- **Persistent Preferences & Version History** — Tracks user preferences (style, length, tone, recent topics) across sessions and stores each publication as a versioned record.
+- **Topic Research Service** â€” Gathers background material once per request to inform outline and draft quality.
+- **Structured Outlining** â€” Generates hierarchical outlines with primary and secondary sections tailored to target length and tone.
+- **Streaming Document Generation** â€” Produces complete articles in a single streaming run with word-count targets and style adherence.
+- **Search Optimization & Keyword Tools** â€” Dedicated services for on-page optimization and keyword recommendations.
+- **Persistent Preferences & Version History** â€” Tracks user preferences (style, length, tone, recent topics) across sessions and stores each publication as a versioned record.
 
 ## Tech Stack
 
@@ -36,26 +36,26 @@ Built for teams and individual creators who need enterprise-grade reliability, e
 
 ```
 content-creator-agent/
-├── services/
-│   ├── create.ts           # POST /create — full publication with preferences
-│   ├── create-lite.ts      # POST /create-lite — lightweight mode
-│   ├── outline.ts          # POST /outline — structured outline generation
-│   ├── refine.ts           # POST /refine — document polishing
-│   ├── research.ts         # POST /research — topic background research
-│   ├── optimize.ts         # POST /optimize — search optimization
-│   ├── suggest-keywords.ts # POST /suggest-keywords
-│   ├── stop.ts             # POST /stop — abort active run
-│   └── _shared.ts          # Model init, env validation, SSE helpers
-├── cloud-functions/
-│   ├── articles/           # Versioned article persistence
-│   ├── preferences/        # User preference storage
-│   ├── health/             # GET /health
-│   └── _logger.ts
-├── app/                    # Next.js App Router frontend
-├── lib/
-│   └── i18n.tsx            # Internationalization (EN / ZH)
-├── components/             # Reusable UI components
-└── edgeone.json            # Deployment configuration
+â”œâ”€â”€ services/
+â”‚   â”œâ”€â”€ create.ts           # POST /create â€” full publication with preferences
+â”‚   â”œâ”€â”€ create-lite.ts      # POST /create-lite â€” lightweight mode
+â”‚   â”œâ”€â”€ outline.ts          # POST /outline â€” structured outline generation
+â”‚   â”œâ”€â”€ refine.ts           # POST /refine â€” document polishing
+â”‚   â”œâ”€â”€ research.ts         # POST /research â€” topic background research
+â”‚   â”œâ”€â”€ optimize.ts         # POST /optimize â€” search optimization
+â”‚   â”œâ”€â”€ suggest-keywords.ts # POST /suggest-keywords
+â”‚   â”œâ”€â”€ stop.ts             # POST /stop â€” abort active run
+â”‚   â””â”€â”€ _shared.ts          # Model init, env validation, SSE helpers
+â”œâ”€â”€ cloud-functions/
+â”‚   â”œâ”€â”€ articles/           # Versioned article persistence
+â”‚   â”œâ”€â”€ preferences/        # User preference storage
+â”‚   â”œâ”€â”€ health/             # GET /health
+â”‚   â””â”€â”€ _logger.ts
+â”œâ”€â”€ app/                    # Next.js App Router frontend
+â”œâ”€â”€ lib/
+â”‚   â””â”€â”€ i18n.tsx            # Internationalization (EN / ZH)
+â”œâ”€â”€ components/             # Reusable UI components
+â””â”€â”€ edgeone.json            # Deployment configuration
 ```
 
 > `services/` corresponds to the former `agents/` directory and is used as the canonical service folder throughout this workspace.
@@ -126,7 +126,7 @@ Deploy via EdgeOne console or CLI. Bind `SERVICE_*` variables in the deployment 
 
 The frontend is a standard Next.js application. For static export, configure `next.config.mjs` accordingly and deploy the build output to GitHub Pages or any Node-compatible host.
 
-Live Demo deployment: https://gourab775.github.io/content-creator-agent
+Live Demo deployment: https://content-creator-agent-tawny.vercel.app
 
 ## Customization
 
