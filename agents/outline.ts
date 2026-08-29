@@ -49,7 +49,7 @@ export async function onRequest(context: any) {
 
     try {
         const envVars = getAgentEnv(env);
-        const modelInstance = await createModel(envVars, { timeout: 60_000 });
+        const modelInstance = await createModel(envVars, { timeout: 60_000, maxTokens: 1500 });
 
         const userMessage = [
             `Topic: "${topic}"`,

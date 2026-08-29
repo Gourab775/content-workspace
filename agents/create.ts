@@ -299,7 +299,9 @@ export async function onRequest(context: any) {
 
     let modelInstance: Model;
     try {
-        modelInstance = await createModel(getAgentEnv(env));
+        const lengthTokens: Record<string, number> = { short: 1500, medium: 2800, long: 4000 };
+        const maxTokens = lengthTokens[length] ?? 2800;
+        modelInstance = await createModel(getAgentEnv(env), { maxTokens });
     } catch (e) {
         return new Response(JSON.stringify({ error: (e as Error).message }), {
             status: 500, headers: { 'Content-Type': 'application/json; charset=UTF-8' },

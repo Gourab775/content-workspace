@@ -36,9 +36,11 @@ export function getAgentEnv(contextEnv: Record<string, string | undefined> | und
 /** Initialize a chat model. Caches per base URL to avoid re-initialization. */
 const modelCache = new Map<string, Model>();
 
-export async function createModel(env: AgentEnv, options?: { timeout?: number }): Promise<Model> {
+export async function createModel(env: AgentEnv, options?: { timeout?: number; maxTokens?: number }): Promise<Model> {
     const modelName = env.AI_GATEWAY_MODEL || DEFAULT_MODEL;
-    const cacheKey = `${modelName}:${env.AI_GATEWAY_BASE_URL}`;
+    // Cap maxTokens to stay within OpenRouter free/low-credit limits (key has ~5475 affordable tokens)
+    const maxTokens = options?.maxTokens ?? 3000;
+    const cacheKey = `${modelName}:${env.AI_GATEWAY_BASE_URL}:${maxTokens}`;
 
     if (modelCache.has(cacheKey)) {
         return modelCache.get(cacheKey)!;
@@ -51,7 +53,10 @@ export async function createModel(env: AgentEnv, options?: { timeout?: number })
             baseURL: env.AI_GATEWAY_BASE_URL,
         },
         timeout: options?.timeout ?? 300_000,
-    });
+        maxTokens,
+        // for newer OpenAI models, also cover maxCompletionTokens
+        maxCompletionTokens: maxTokens,
+    } as any);
 
     modelCache.set(cacheKey, model);
     return model;

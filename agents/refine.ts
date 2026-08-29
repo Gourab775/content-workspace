@@ -120,7 +120,9 @@ export async function onRequest(context: any) {
     let modelInstance: Model;
     try {
         const envVars = getAgentEnv(env);
-        modelInstance = await createModel(envVars);
+        // section refine needs less, full article needs more — cap at 3000
+        const maxTokens = section ? 1500 : 3000;
+        modelInstance = await createModel(envVars, { maxTokens });
     } catch (e) {
         const msg = (e as Error).message;
         logger.error(msg);

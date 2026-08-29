@@ -165,14 +165,14 @@ function HomeInner() {
           updateStep("research", "done");
           updateStep("outline", "active");
         } else {
-          // If outline fails, fall through to direct generation
-          console.error('Outline generation failed, falling back to direct generation');
+          // If outline fails, fall through to direct generation (not an error, just fallback)
+          console.warn('Outline generation fallback to direct generation');
           setIsGeneratingOutline(false);
           handleDirectGenerate(params);
           return;
         }
       } catch (err) {
-        console.error('Outline error:', err);
+        console.warn('Outline error, falling back:', err);
         setIsGeneratingOutline(false);
         handleDirectGenerate(params);
         return;

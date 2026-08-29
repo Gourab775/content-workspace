@@ -29,7 +29,7 @@ export async function onRequest(context: any) {
 
     try {
         const envVars = getAgentEnv(env);
-        const model = await createModel(envVars, { timeout: 30_000 });
+        const model = await createModel(envVars, { timeout: 30_000, maxTokens: 400 });
 
         logger.log(`Suggesting keywords for: "${topic}" (conversation: ${conversationId || 'none'})`);
 

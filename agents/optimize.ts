@@ -20,7 +20,7 @@ export async function onRequest(context: any) {
 
 
         const envVars = getAgentEnv(env);
-        const modelInstance = await createModel(envVars, { timeout: 120_000 });
+        const modelInstance = await createModel(envVars, { timeout: 120_000, maxTokens: 1200 });
 
         const prompt = `Analyze the following content for SEO optimization. Return a JSON response with:
 - score (0-100): overall SEO score

@@ -103,7 +103,7 @@ export async function onRequest(context: any) {
     let agentInstance: Agent;
     try {
         const envVars = getAgentEnv(env);
-        const modelInstance = await createModel(envVars);
+        const modelInstance = await createModel(envVars, { maxTokens: 2000 });
         agentInstance = getAgent(modelInstance, contextTools);
     } catch (e) {
         return new Response(JSON.stringify({ error: (e as Error).message }), {
