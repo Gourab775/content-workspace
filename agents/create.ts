@@ -1,12 +1,11 @@
 /**
  * Content Creation Agent — DeepAgent Mode
  * Full agent framework with memory, structured prompts, and real web search.
+ * Uses direct fetch to OpenRouter (no OpenAI SDK / langchain model)
  */
-import { initChatModel, tool } from 'langchain';
+import { tool } from 'langchain';
 import { HumanMessage, AIMessage, ToolMessage as LCToolMessage } from '@langchain/core/messages';
-import { getAgentEnv, createModel, createLogger, sseEvent, createSSEResponse } from './_shared';
-
-type Model = Awaited<ReturnType<typeof initChatModel>>;
+import { getAgentEnv, createLogger, sseEvent, createSSEResponse } from './_shared';
 
 const logger = createLogger('create');
 
@@ -27,13 +26,7 @@ interface UserMemory {
     toneNotes: string;
 }
 
-/**
- * Read the latest preference record.
- * History is accumulated via `appendMessage` (multiple records); the latest
- * record is the current value. We no longer simulate a KV with
- * `clearMessages + appendMessage` (SOP H-163 forbids it).
- */
-async function loadUserMemory(store: any, userId: string): Promise<UserMemory | null> {
+async function loadUserMemory(store: any, userId: string): Promise<any | null> {
     if (!store) return null;
     try {
         const conversationId = `user-prefs-${userId}`;
@@ -49,11 +42,6 @@ async function loadUserMemory(store: any, userId: string): Promise<UserMemory | 
     }
 }
 
-/**
- * Persist preferences by appending a new record (keeps full history).
- * We no longer call clearMessages — appending preserves an audit-friendly
- * evolution trail.
- */
 async function recordUsage(store: any, userId: string, topic: string, keywords?: string, style?: string, length?: string) {
     if (!store) return;
     try {
@@ -90,7 +78,7 @@ async function recordUsage(store: any, userId: string, topic: string, keywords?:
 // ============================================================
 // System Prompt — English Only
 // ============================================================
-function buildSystemPrompt(memory: UserMemory | null, articleLength: string): string {
+function buildSystemPrompt(memory: any | null, articleLength: string): string {
     let prompt = `You are a professional English content creator. Today's date is ${new Date().toISOString().slice(0, 10)}.
 
 ## Workflow
@@ -143,9 +131,18 @@ Each ## must contain 2-3 ### subsections. Never flat-list only ##.
 }
 
 // ============================================================
-// Core Stream
+// Core Stream — Direct fetch to OpenRouter (no OpenAI SDK)
 // ============================================================
-async function* generateStream(modelInstance: Model, userMessage: string, systemPrompt: string, contextTools: any, signal?: AbortSignal): AsyncGenerator<string> {
+async function* generateStream(
+    apiKey: string,
+    baseURL: string,
+    model: string,
+    maxTokens: number,
+    userMessage: string,
+    systemPrompt: string,
+    contextTools: any,
+    signal?: AbortSignal
+): AsyncGenerator<string> {
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
 
@@ -155,100 +152,131 @@ async function* generateStream(modelInstance: Model, userMessage: string, system
 
     try {
         logger.log(`Starting: "${userMessage.slice(0, 80)}"`);
-        const modelWithTools = modelInstance.bindTools(tools);
+
         const messages: any[] = [
             { role: 'system', content: systemPrompt },
-            new HumanMessage(userMessage),
+            { role: 'user', content: userMessage },
         ];
         let searchDone = false;
 
         for (let i = 0; i < 3; i++) {
             if (signal?.aborted) break;
 
-            const activeModel = searchDone ? modelInstance : modelWithTools;
-            const stream = await activeModel.stream(messages);
+            const response = await fetch(`${baseURL}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json',
+                    'HTTP-Referer': 'https://github.com/Gourab775/content-workspace',
+                    'X-Title': 'Content Workspace',
+                },
+                body: JSON.stringify({
+                    model: 'openai/gpt-4o-mini',
+                    messages: searchDone ? messages : [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userMessage },
+                    ],
+                    tools: tools.length > 0 && !searchDone ? tools.map(t => ({
+                        type: 'function',
+                        function: {
+                            name: t.name,
+                            description: t.description || '',
+                            parameters: t.schema || { type: 'object', properties: {} },
+                        },
+                    })) : undefined,
+                    tool_choice: tools.length > 0 && !searchDone ? 'auto' : 'none',
+                    max_tokens: 2800,
+                    stream: true,
+                }),
+                signal,
+            });
+
+            if (!response.ok) {
+                const err = await response.text();
+                throw new Error(`OpenRouter ${response.status}: ${err}`);
+            }
+
+            const reader = response.body?.getReader();
+            if (!reader) throw new Error('No response body');
+
+            const decoder = new TextDecoder();
             let fullContent = '';
             let toolCalls: any[] = [];
 
-            for await (const chunk of stream) {
-                if (signal?.aborted) break;
-                const msg = chunk as any;
+            try {
+                while (true) {
+                    if (signal?.aborted) break;
+                    const { done, value } = await reader.read();
+                    if (done) break;
 
-                if (msg?.usage_metadata) {
-                    totalInputTokens += msg.usage_metadata.input_tokens || 0;
-                    totalOutputTokens += msg.usage_metadata.output_tokens || 0;
-                }
-                if (msg?.response_metadata?.usage) {
-                    totalInputTokens += msg.response_metadata.usage.prompt_tokens || 0;
-                    totalOutputTokens += msg.response_metadata.usage.completion_tokens || 0;
-                }
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n');
 
-                if (msg?.tool_call_chunks?.length) {
-                    for (const tc of msg.tool_call_chunks) {
-                        if (tc.index !== undefined) {
-                            while (toolCalls.length <= tc.index) toolCalls.push({ name: '', args: '' });
-                            if (tc.name) toolCalls[tc.index].name = tc.name;
-                            if (tc.args) toolCalls[tc.index].args += tc.args;
-                            if (tc.id) toolCalls[tc.index].id = tc.id;
-                        }
+                    for (const line of lines) {
+                        if (!line.startsWith('data: ')) continue;
+                        const data = line.slice(6).trim();
+                        if (data === '[DONE]') continue;
+
+                        try {
+                            const parsed = JSON.parse(data);
+                            const choice = parsed.choices?.[0];
+                            if (!choice) continue;
+
+                            const delta = choice.delta || {};
+                            
+                            if (delta.tool_calls) {
+                                for (const tc of delta.tool_calls) {
+                                    if (tc.index !== undefined) {
+                                        while (toolCalls.length <= tc.index) toolCalls.push({ name: '', args: '', id: '' });
+                                        if (tc.name) toolCalls[tc.index].name = tc.function?.name || '';
+                                        if (tc.function?.arguments) toolCalls[tc.index].args += tc.function.arguments;
+                                        if (tc.id) toolCalls[tc.index].id = tc.id;
+                                    }
+                                }
+                            }
+
+                            if (delta.content) {
+                                const cleaned = delta.content.replace(/\n{3,}/g, '\n\n');
+                                if (cleaned) yield sseEvent({ type: 'ai_response', content: cleaned });
+                            }
+                        } catch {}
                     }
                 }
 
-                if (msg?.text) {
-                    fullContent += msg.text;
-                    // Filter DSML markup
-                    if (msg.text.includes('DSML') || msg.text.includes('tool_calls>') || msg.text.includes('invoke>') || msg.text.includes('parameter>')) {
+                if (toolCalls.length > 0) {
+                    const validCalls = toolCalls.filter(tc => tc.name);
+                    if (validCalls.length > 0) {
+                        // Execute tools
+                        for (const tc of validCalls) {
+                            yield sseEvent({ type: 'tool_call', name: tc.name });
+                            const toolObj = tools.find((t: any) => t.name === tc.name);
+                            if (toolObj) {
+                                const result = await toolObj.invoke(JSON.parse(tc.args || '{}'));
+                                const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
+                                yield sseEvent({ type: 'tool_result', name: tc.name, content: resultStr.slice(0, 500) });
+                            }
+                        }
+                        searchDone = true;
                         continue;
                     }
-                    const cleaned = msg.text.replace(/\n{3,}/g, '\n\n');
-                    if (cleaned) yield sseEvent({ type: 'ai_response', content: cleaned });
                 }
-            }
 
-            if (fullContent && toolCalls.length === 0) {
-                const hasDSML = fullContent.includes('DSML') || fullContent.includes('<tool_calls>') || fullContent.includes('<invoke');
-                if (hasDSML && !searchDone) {
-                    searchDone = true;
-                    messages.push(new AIMessage({ content: '' }));
-                    logger.log('Model output DSML as text, retrying without tools');
-                    continue;
-                }
+                // If no tool calls, we're done
                 break;
-            }
-
-            if (toolCalls.length > 0) {
-                const validCalls = toolCalls.filter(tc => tc.name);
-                const aiMsg = new AIMessage({
-                    content: fullContent || '',
-                    tool_calls: validCalls.map(tc => ({
-                        name: tc.name,
-                        args: JSON.parse(tc.args || '{}'),
-                        id: tc.id || `call_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-                    })),
-                });
-                messages.push(aiMsg);
-
-                for (let j = 0; j < aiMsg.tool_calls!.length; j++) {
-                    const tc = aiMsg.tool_calls![j];
-                    if (j === 0) {
-                        yield sseEvent({ type: 'tool_call', name: tc.name });
-                        const toolObj = tools.find((t: any) => t.name === tc.name);
-                        if (toolObj) {
-                            const result = await toolObj.invoke(tc.args);
-                            const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
-                            yield sseEvent({ type: 'tool_result', name: tc.name, content: resultStr });
-                            messages.push(new LCToolMessage({ content: resultStr, tool_call_id: tc.id || '' }));
-                        }
-                    } else {
-                        messages.push(new LCToolMessage({ content: 'Already searched — please write the article directly.', tool_call_id: tc.id || '' }));
-                    }
+            } catch (e: unknown) {
+                const error = e as Error;
+                if (error.name === 'AbortError' || signal?.aborted) {
+                    // Normal abort
+                    break;
+                } else if (error.message?.includes('terminated')) {
+                    logger.log('Stream terminated by runtime');
+                    break;
+                } else {
+                    logger.error('Error:', error.message);
+                    yield sseEvent({ type: 'error_message', content: error.message });
+                    break;
                 }
-
-                searchDone = true;
-                continue;
             }
-
-            break;
         }
     } catch (e: unknown) {
         const error = e as Error;
@@ -262,8 +290,8 @@ async function* generateStream(modelInstance: Model, userMessage: string, system
         }
     }
 
-    logger.log(`Tokens — input: ${totalInputTokens}, output: ${totalOutputTokens}`);
-    yield sseEvent({ type: 'usage', input_tokens: totalInputTokens, output_tokens: totalOutputTokens, total_tokens: totalInputTokens + totalOutputTokens });
+    yield sseEvent({ type: 'usage', input_tokens: 0, output_tokens: 0, total_tokens: 0 });
+    yield "data: [DONE]\n\n";
 }
 
 // ============================================================
@@ -297,30 +325,28 @@ export async function onRequest(context: any) {
 
     const systemPrompt = buildSystemPrompt(memory, length);
 
-    let modelInstance: Model;
     try {
+        const envVars = getAgentEnv(env);
+        const apiKey = envVars.AI_GATEWAY_API_KEY;
+        const baseURL = envVars.AI_GATEWAY_BASE_URL || 'https://openrouter.ai/api/v1';
         const lengthTokens: Record<string, number> = { short: 1500, medium: 2800, long: 4000 };
         const maxTokens = lengthTokens[length] ?? 2800;
-        modelInstance = await createModel(getAgentEnv(env), { maxTokens });
+
+        const generator = (s?: AbortSignal) => generateStream(
+            envVars.AI_GATEWAY_API_KEY,
+            envVars.AI_GATEWAY_BASE_URL || 'https://openrouter.ai/api/v1',
+            'openai/gpt-4o-mini',
+            maxTokens,
+            userMessage,
+            systemPrompt,
+            contextTools,
+            s
+        );
+
+        return createSSEResponse(generator, signal);
     } catch (e) {
         return new Response(JSON.stringify({ error: (e as Error).message }), {
             status: 500, headers: { 'Content-Type': 'application/json; charset=UTF-8' },
         });
     }
-
-    const generator = (s?: AbortSignal) => {
-        const g = generateStream(modelInstance, userMessage, systemPrompt, contextTools, s);
-        // wrap: append [DONE] and fire-and-forget recordUsage
-        return (async function* () {
-            try {
-                for await (const chunk of g) yield chunk;
-            } finally {
-                // recordUsage after stream completes (or aborts)
-                recordUsage(store, userId, topic || message?.slice(0, 50), keywords, style, length).catch(() => {});
-                yield "data: [DONE]\n\n";
-            }
-        })();
-    };
-
-    return createSSEResponse(generator, signal);
 }
