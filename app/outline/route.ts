@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -49,11 +48,9 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-        const client = new OpenAI({
-            apiKey: process.env.AI_GATEWAY_API_KEY || '',
-            baseURL: process.env.AI_GATEWAY_BASE_URL || 'https://openrouter.ai/api/v1',
-            defaultQuery: { max_tokens: '1500' },
-        });
+        const apiKey = process.env.AI_GATEWAY_API_KEY || '';
+        const baseURL = process.env.AI_GATEWAY_BASE_URL || 'https://openrouter.ai/api/v1';
+        const model = process.env.AI_GATEWAY_MODEL || 'openai/gpt-4o-mini';
 
         const userMessage = [
             `Topic: "${topic}"`,
@@ -65,16 +62,31 @@ export async function POST(req: NextRequest) {
 
         logger.log(`Generating outline for: "${topic}"`);
 
-        const response = await client.chat.completions.create({
-            model: 'openai/gpt-4o-mini',
-            messages: [
-                { role: 'system', content: SYSTEM_PROMPT },
-                { role: 'user', content: userMessage },
-            ],
-            max_tokens: 1500,
+        const response = await fetch(`${baseURL}/chat/completions`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'https://github.com/Gourab775/content-workspace',
+                'X-Title': 'Content Workspace',
+            },
+            body: JSON.stringify({
+                model,
+                messages: [
+                    { role: 'system', content: SYSTEM_PROMPT },
+                    { role: 'user', content: userMessage },
+                ],
+                max_tokens: 1500,
+            }),
         });
 
-        const text = response.choices[0]?.message?.content || '';
+        if (!response.ok) {
+            const err = await response.text();
+            throw new Error(`OpenRouter ${response.status}: ${err}`);
+        }
+
+        const data = await response.json();
+        const text = data.choices[0]?.message?.content || '';
         logger.log('Raw outline response:', text.slice(0, 200));
 
         let outline: any;
@@ -102,7 +114,7 @@ export async function POST(req: NextRequest) {
             };
         }
 
-        const usage = response.usage;
+        const usage = data.usage;
         const tokenUsage = {
             input_tokens: usage?.prompt_tokens || 0,
             output_tokens: usage?.completion_tokens || 0,

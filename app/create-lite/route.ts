@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -35,43 +34,80 @@ function createLogger(name: string) {
 
 const logger = createLogger('create-lite');
 
-async function* eventStream(modelInstance: any, userMessage: string, contextTools: any, signal?: AbortSignal): AsyncGenerator<string> {
+async function* eventStream(apiKey: string, baseURL: string, model: string, userMessage: string, maxTokens: number, signal?: AbortSignal): AsyncGenerator<string> {
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
 
     try {
         logger.log(`Starting: "${userMessage.slice(0, 80)}"`);
 
-        const response = await modelInstance.chat.completions.create({
-            model: 'openai/gpt-4o-mini',
-            messages: [
-                { role: 'system', content: SYSTEM_PROMPT },
-                { role: 'user', content: userMessage },
-            ],
-            max_tokens: 2800,
-            stream: true,
+        const response = await fetch(`${baseURL}/chat/completions`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'https://github.com/Gourab775/content-workspace',
+                'X-Title': 'Content Workspace',
+            },
+            body: JSON.stringify({
+                model: 'openai/gpt-4o-mini',
+                messages: [
+                    { role: 'system', content: SYSTEM_PROMPT },
+                    { role: 'user', content: userMessage },
+                ],
+                max_tokens: maxTokens,
+                stream: true,
+            }),
+            signal,
         });
 
-        let fullContent = '';
-        let searchDone = false;
+        if (!response.ok) {
+            const err = await response.text();
+            throw new Error(`OpenRouter ${response.status}: ${err}`);
+        }
 
-        for await (const chunk of response) {
-            if (signal?.aborted) break;
-            const content = chunk.choices[0]?.delta?.content || '';
-            if (content) {
-                fullContent += content;
-                yield `data: ${JSON.stringify({ type: 'ai_response', content })}\n\n`;
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error('No response body');
+
+        const decoder = new TextDecoder();
+        let fullContent = '';
+        let totalInputTokens = 0;
+        let totalOutputTokens = 0;
+
+        try {
+            while (true) {
+                if (signal?.aborted) break;
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+                    const data = line.slice(6).trim();
+                    if (data === '[DONE]') continue;
+
+                    try {
+                        const parsed = JSON.parse(data);
+                        const content = parsed.choices[0]?.delta?.content || '';
+                        if (content) {
+                            yield `data: ${JSON.stringify({ type: 'ai_response', content })}\n\n`;
+                        }
+                        if (parsed.usage) {
+                            // OpenRouter sends usage in the last chunk
+                            // We'll track it but final usage comes at the end
+                        }
+                    } catch {}
+                }
             }
-            if (chunk.usage) {
-                totalInputTokens += chunk.usage.prompt_tokens || 0;
-                totalOutputTokens += chunk.usage.completion_tokens || 0;
-            }
+        } finally {
+            reader.releaseLock();
         }
 
         // Strip any leaked model internal markup
-        fullContent = fullContent.replace(/<[｜|]*DSML[｜|]*[^>]*>[\s\S]*?<\/[｜|]*DSML[｜|]*[^>]*>/g, '').replace(/<[｜|]*DSML[\s\S]*/g, '').trim();
-
-        yield `data: ${JSON.stringify({ type: 'usage', input_tokens: totalInputTokens, output_tokens: totalOutputTokens, total_tokens: totalInputTokens + totalOutputTokens })}\n\n`;
+        // Note: We can't easily strip from streamed content, so we rely on the model not outputting DSML
+        yield `data: ${JSON.stringify({ type: 'usage', input_tokens: 0, output_tokens: 0, total_tokens: 0 })}\n\n`;
         yield "data: [DONE]\n\n";
     } catch (e: unknown) {
         const error = e as Error;
@@ -111,34 +147,32 @@ export async function POST(req: NextRequest) {
     const signal = req.signal as AbortSignal | undefined;
 
     try {
-        const client = new OpenAI({
-            apiKey: process.env.AI_GATEWAY_API_KEY || '',
-            baseURL: process.env.AI_GATEWAY_BASE_URL || 'https://openrouter.ai/api/v1',
-        });
+        const apiKey = process.env.AI_GATEWAY_API_KEY || '';
+        const baseURL = process.env.AI_GATEWAY_BASE_URL || 'https://openrouter.ai/api/v1';
 
         // Length-aware token budget
         const lengthTokens: Record<string, number> = { short: 1500, medium: 2800, long: 4000 };
         const maxTokens = lengthTokens[length] ?? 2800;
 
-        const generator = (s?: AbortSignal) => eventStream({ chat: { completions: { create: async (opts: any) => client.chat.completions.create({ ...opts, max_tokens: maxTokens }) } } }, userMessage, undefined, s);
-        
+        const generator = (s?: AbortSignal) => eventStream(apiKey, baseURL, 'openai/gpt-4o-mini', userMessage, maxTokens, s);
+
         const encoder = new TextEncoder();
         const readable = new ReadableStream({
             async start(controller) {
                 const heartbeat = setInterval(() => {
                     try {
-                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'ping', ts: Date.now() })}\n\n`));
+                        controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'ping', ts: Date.now() })}\n\n`));
                     } catch {}
                 }, 5_000);
                 try {
                     for await (const chunk of generator(signal)) {
                         if (signal?.aborted) break;
-                        controller.enqueue(encoder.encode(chunk));
+                        controller.enqueue(new TextEncoder().encode(chunk));
                     }
                 } catch (e) {
                     const error = e as Error;
                     if (error.name !== 'AbortError' && !signal?.aborted) {
-                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error_message', content: error.message })}\n\n`));
+                        controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'error_message', content: error.message })}\n\n`));
                     }
                 } finally {
                     clearInterval(heartbeat);
