@@ -88,52 +88,55 @@ async function recordUsage(store: any, userId: string, topic: string, keywords?:
 }
 
 // ============================================================
-// System Prompt
+// System Prompt — English Only
 // ============================================================
 function buildSystemPrompt(memory: UserMemory | null, articleLength: string): string {
-    let prompt = `你是专业内容创作者。日期：${new Date().toISOString().slice(0, 10)}。
+    let prompt = `You are a professional English content creator. Today's date is ${new Date().toISOString().slice(0, 10)}.
 
-## 工作流程
-1. 先使用 web_search 工具搜索话题，获取最新信息和数据
-2. 根据搜索结果撰写完整文章
+## Workflow
+1. Use the web_search tool ONCE to research the topic and gather current insights
+2. Write the COMPLETE article directly based on search results
 
-## 文章结构（必须严格遵守）
+## Article Structure (strictly follow)
 
 \`\`\`
-# 标题
+# Title
 
-引言（2-3句，点题+文章价值）
+Introduction (2-3 sentences: hook + value proposition)
 
-## 章节一
-导入语
+## Section One
+Intro sentence
 
-### 子标题1.1
-段落内容（3-5句，有论据/数据/案例）
+### Subheading 1.1
+Body paragraph (3-5 sentences with evidence / data / examples)
 
-### 子标题1.2
-段落内容
+### Subheading 1.2
+Body paragraph
 
-## 章节二
-...（同上结构）
+## Section Two
+... (same nested structure)
 
-## 总结与展望
-结语段落
+## Conclusion & Outlook
+Closing paragraph
 \`\`\`
 
-每个 ## 下必须有 2-3 个 ### 子节。禁止全文只用 ## 平铺。
+Each ## must contain 2-3 ### subsections. Never flat-list only ##.
 
-## 长度：${articleLength}
-:${articleLength === 'short' ? '~1000字，4-5个##，每##含2个###' : articleLength === 'long' ? '~5000字，10-12个##，每##含3-4个###' : '~2500字，6-8个##，每##含2-3个###'}
+## Target Length (English word count)
+:${articleLength === 'short' ? '~800 words, 4-5 H2 sections, each with 2 H3 subsections' : articleLength === 'long' ? '~4000 words, 10-12 H2 sections, each with 3-4 H3 subsections' : '~2000 words, 6-8 H2 sections, each with 2-3 H3 subsections'}
 
-语言：与用户话题一致。中文按汉字计，必须达到目标字数。`;
+## Language & Style
+- Output MUST be in English only, regardless of input topic language. Translate the topic if needed.
+- Follow the requested style (informative / persuasive / technical / casual) consistently.
+- Word count is strict: meet or slightly exceed the target.`;
 
     if (memory && memory.totalArticles > 0) {
         const parts: string[] = [];
-        if (memory.defaultStyle && memory.defaultStyle !== 'informative') parts.push(`风格：${memory.defaultStyle}`);
-        if (memory.toneNotes) parts.push(`语气：${memory.toneNotes}`);
+        if (memory.defaultStyle && memory.defaultStyle !== 'informative') parts.push(`Style: ${memory.defaultStyle}`);
+        if (memory.toneNotes) parts.push(`Tone: ${memory.toneNotes}`);
         if (memory.customInstructions) parts.push(memory.customInstructions);
-        if (memory.avoidPatterns?.length) parts.push(`避免：${memory.avoidPatterns.join('、')}`);
-        if (parts.length > 0) prompt += `\n\n用户偏好：${parts.join('；')}`;
+        if (memory.avoidPatterns?.length) parts.push(`Avoid: ${memory.avoidPatterns.join(', ')}`);
+        if (parts.length > 0) prompt += `\n\nUser preferences: ${parts.join('; ')}`;
     }
 
     return prompt;
@@ -237,7 +240,7 @@ async function* generateStream(modelInstance: Model, userMessage: string, system
                             messages.push(new LCToolMessage({ content: resultStr, tool_call_id: tc.id || '' }));
                         }
                     } else {
-                        messages.push(new LCToolMessage({ content: '已搜索过，请直接写文章。', tool_call_id: tc.id || '' }));
+                        messages.push(new LCToolMessage({ content: 'Already searched — please write the article directly.', tool_call_id: tc.id || '' }));
                     }
                 }
 
@@ -272,15 +275,15 @@ export async function onRequest(context: any) {
 
     let userMessage = message || '';
     if (topic) {
-        userMessage = `写一篇关于「${topic}」的文章`;
-        if (keywords) userMessage += `\n关键词：${keywords}`;
-        if (style) userMessage += `\n风格：${style}`;
-        if (length) userMessage += `\n长度：${length}`;
+        userMessage = `Write an article about "${topic}" in English`;
+        if (keywords) userMessage += `\nTarget keywords: ${keywords}`;
+        if (style) userMessage += `\nWriting style: ${style}`;
+        if (length) userMessage += `\nTarget length: ${length}`;
         if (outline?.sections) {
-            userMessage += `\n\n按以下大纲写作：`;
-            userMessage += `\n标题：${outline.title}`;
+            userMessage += `\n\nFollow this outline:`;
+            userMessage += `\nTitle: ${outline.title}`;
             for (const section of outline.sections) {
-                userMessage += `\n- ${section.heading}：${(section.keyPoints || []).join('、')}`;
+                userMessage += `\n- ${section.heading}: ${(section.keyPoints || []).join('; ')}`;
             }
         }
     }

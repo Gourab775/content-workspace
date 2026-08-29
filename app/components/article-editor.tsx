@@ -172,11 +172,7 @@ export function ArticleEditor({
           )}
           {!isGenerating && !isRefining && content && (
             <span className="text-sm text-gray-500">
-              {(() => {
-                const chinese = (content.match(/[\u4e00-\u9fff]/g) || []).length;
-                const english = content.replace(/[\u4e00-\u9fff]/g, '').split(/\s+/).filter(Boolean).length;
-                return chinese + english;
-              })()} {t.wordCount}
+              {content.split(/\s+/).filter(Boolean).length} {t.wordCount}
             </span>
           )}
 
@@ -310,11 +306,7 @@ export function ArticleEditor({
             )}
             {!isGenerating && !isRefining && content && (
               <span className="text-sm text-gray-400">
-                {(() => {
-                  const chinese = (content.match(/[\u4e00-\u9fff]/g) || []).length;
-                  const english = content.replace(/[\u4e00-\u9fff]/g, '').split(/\s+/).filter(Boolean).length;
-                  return chinese + english;
-                })()} {t.wordCount}
+                {content.split(/\s+/).filter(Boolean).length} {t.wordCount}
               </span>
             )}
           </div>

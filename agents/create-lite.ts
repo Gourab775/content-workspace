@@ -24,7 +24,7 @@ function stripDSML(text: string): string {
         .replace(/<\/?(tool_calls|invoke|parameter)[^>]*>/g, '');
 }
 
-const SYSTEM_PROMPT = `You are a professional content creator. Today's date is ${new Date().toISOString().slice(0, 10)}.
+const SYSTEM_PROMPT = `You are a professional English content creator. Today's date is ${new Date().toISOString().slice(0, 10)}.
 
 WORKFLOW:
 1. Use web_search ONCE to research the topic
@@ -32,18 +32,18 @@ WORKFLOW:
 
 RULES:
 - Call web_search exactly ONCE, then write the full article as text
+- Output MUST be in English only — translate the topic if needed
 - Output in markdown format. Use this heading hierarchy:
   - # (H1) for the article title (first line only)
   - ## (H2) for main sections (e.g. Introduction, Conclusion, major topic sections)
   - ### (H3) for subsections within a main section
   - #### (H4) for detailed points within a subsection (use sparingly)
   Never use only H2 or only H3 throughout — vary the depth to match content structure.
-- Write in the same language as the user's topic
-- For Chinese: count by 汉字. For English: count by words.
+- Word count (English): count by words.
 - STRICTLY follow the target length:
-  - "short" ≈ 1000 Chinese characters OR 800 English words, 4-5 sections
-  - "medium" ≈ 2500 Chinese characters OR 2000 English words, 6-8 sections
-  - "long" ≈ 5000 Chinese characters OR 4000 English words, 10-15 sections
+  - "short" ≈ 800 words, 4-5 sections
+  - "medium" ≈ 2000 words, 6-8 sections
+  - "long" ≈ 4000 words, 10-15 sections
 - IMPORTANT: Do NOT write less than the target length.`;
 
 async function* eventStream(modelInstance: Model, userMessage: string, contextTools: any, signal?: AbortSignal): AsyncGenerator<string> {

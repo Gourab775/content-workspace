@@ -106,7 +106,7 @@ export function TopicForm({ onGenerate, onStop, isGenerating, preferences }: Top
           <Input
             id="keywords"
             label={t.keywords}
-            placeholder={isLoadingKeywords ? ((t as any).suggestingKeywords || '正在生成建议关键词...') : t.keywordsPlaceholder}
+            placeholder={isLoadingKeywords ? ((t as any).suggestingKeywords || 'AI suggesting keywords...') : t.keywordsPlaceholder}
             value={keywords}
             onChange={handleKeywordsChange}
             disabled={isGenerating}
@@ -170,7 +170,7 @@ export function TopicForm({ onGenerate, onStop, isGenerating, preferences }: Top
 
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              {(t as any).agentMode || '生成模式'}
+              {(t as any).agentMode || 'Generation Mode'}
             </label>
             <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 p-0.5">
               <button
@@ -184,7 +184,7 @@ export function TopicForm({ onGenerate, onStop, isGenerating, preferences }: Top
                     : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
                 )}
               >
-                {(t as any).modeLite || '轻量'}
+                {(t as any).modeLite || 'Lite'}
               </button>
               <button
                 type="button"
@@ -202,8 +202,8 @@ export function TopicForm({ onGenerate, onStop, isGenerating, preferences }: Top
             </div>
             <p className="text-[10px] text-gray-400 dark:text-gray-500">
               {mode === "lite"
-                ? ((t as any).modeLiteDesc || '低 Token 消耗，快速生成')
-                : ((t as any).modeDeepAgentDesc || '完整 Agent 框架，功能更丰富')}
+                ? ((t as any).modeLiteDesc || 'Low token usage, fast generation')
+                : ((t as any).modeDeepAgentDesc || 'Full agent framework, richer features')}
             </p>
           </div>
 

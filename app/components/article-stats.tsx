@@ -19,31 +19,19 @@ export function ArticleStats({ content }: ArticleStatsProps) {
   const { t } = useI18n();
   const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
 
-  // Compute stats
+  // Compute stats — English-only
   const stats = useMemo(() => {
     if (!content) {
       return { charCount: 0, wordCount: 0, paragraphCount: 0, readingTime: 0, h1: 0, h2: 0, h3: 0 };
     }
-    // Character count (includes Chinese characters)
     const charCount = content.length;
-
-    // Word count: Chinese characters count as 1 word each, English words counted separately
-    const chineseChars = (content.match(/[\u4e00-\u9fff\u3400-\u4dbf]/g) || []).length;
-    const withoutChinese = content.replace(/[\u4e00-\u9fff\u3400-\u4dbf]/g, ' ');
-    const englishWords = withoutChinese.split(/\s+/).filter((w) => w.length > 0).length;
-    const wordCount = chineseChars + englishWords;
-
-    // Paragraph count
+    const wordCount = content.split(/\s+/).filter((w) => w.length > 0).length;
     const paragraphCount = content.split(/\n\s*\n/).filter((p) => p.trim().length > 0).length;
-
-    // Reading time (Chinese: 400 chars/min, English: 200 words/min)
-    const readingTime = Math.max(1, Math.ceil((chineseChars / 400) + (englishWords / 200)));
-
-    // Heading counts
+    // Reading time: 200 words/min for English
+    const readingTime = Math.max(1, Math.ceil(wordCount / 200));
     const h1 = (content.match(/^# [^#]/gm) || []).length;
     const h2 = (content.match(/^## [^#]/gm) || []).length;
     const h3 = (content.match(/^### [^#]/gm) || []).length;
-
     return { charCount, wordCount, paragraphCount, readingTime, h1, h2, h3 };
   }, [content]);
 
@@ -59,7 +47,7 @@ export function ArticleStats({ content }: ArticleStatsProps) {
         const text = match[2].trim();
         const id = text
           .toLowerCase()
-          .replace(/[^a-zA-Z0-9\u4e00-\u9fff\s-]/g, '')
+          .replace(/[^a-zA-Z0-9\s-]/g, '')
           .replace(/\s+/g, '-')
           .slice(0, 80);
         result.push({ level, text, id });
@@ -83,7 +71,7 @@ export function ArticleStats({ content }: ArticleStatsProps) {
           const text = el.textContent || '';
           const id = text
             .toLowerCase()
-            .replace(/[^a-zA-Z0-9\u4e00-\u9fff\s-]/g, '')
+            .replace(/[^a-zA-Z0-9\s-]/g, '')
             .replace(/\s+/g, '-')
             .slice(0, 80);
           currentId = id;

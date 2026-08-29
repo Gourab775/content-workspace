@@ -7,8 +7,8 @@ interface DeployButtonsProps {
   templateSlug: string;
   /** GitHub repository URL. */
   githubUrl: string;
-  /** UI language for the deploy button label. */
-  lang?: 'zh' | 'en';
+  /** UI language for the deploy button label. English-only now. */
+  lang?: 'en';
 }
 
 const QUERY_SUFFIX = '&from=within&fromAgent=1&agentLang=typescript';
@@ -25,7 +25,7 @@ const QUERY_SUFFIX = '&from=within&fromAgent=1&agentLang=typescript';
  * deploy button uses a fixed brand blue that reads well on light and dark
  * headers alike — no dependency on each template's dark-mode strategy.
  */
-export function DeployButtons({ templateSlug, githubUrl, lang = 'en' }: DeployButtonsProps) {
+export function DeployButtons({ templateSlug, githubUrl }: DeployButtonsProps) {
   const tencentUrl = `https://console.cloud.tencent.com/edgeone/makers/new?template=${templateSlug}${QUERY_SUFFIX}`;
   const edgeoneAiUrl = `https://edgeone.ai/makers/new?template=${templateSlug}${QUERY_SUFFIX}`;
   const [deployUrl, setDeployUrl] = useState(tencentUrl);
@@ -63,7 +63,7 @@ export function DeployButtons({ templateSlug, githubUrl, lang = 'en' }: DeployBu
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
         </svg>
-        {lang === 'zh' ? '一键部署' : 'Deploy'}
+        Deploy
       </a>
     </div>
   );

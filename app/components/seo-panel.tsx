@@ -50,14 +50,13 @@ export function SeoPanel({ content, keywords }: SeoPanelProps) {
       const avgSentenceLen = sentences.length > 0 ? Math.round(content.length / sentences.length) : 0;
       const readabilityScore = avgSentenceLen < 30 ? 90 : avgSentenceLen < 50 ? 75 : avgSentenceLen < 80 ? 60 : 45;
 
-      // Suggestions
+      // Suggestions — English only
       const suggestions: string[] = [];
-      const isZh = /[\u4e00-\u9fff]/.test(content);
-      if (h2 < 3) suggestions.push(isZh ? '建议增加更多二级标题 (##) 来组织内容' : 'Add more H2 headings to structure content');
-      if (keywordDensity < 1 && keywordList.length > 0) suggestions.push(isZh ? '关键词密度偏低，建议适当增加' : 'Keyword density is low');
-      if (keywordDensity > 5) suggestions.push(isZh ? '关键词密度过高，可能被视为堆砌' : 'Keyword density too high');
-      if (content.length < 500) suggestions.push(isZh ? '文章较短，建议扩展到 800+ 字' : 'Article is short, aim for 800+ words');
-      if (suggestions.length === 0) suggestions.push(isZh ? '内容结构良好，SEO 表现优秀' : 'Content is well-structured for SEO');
+      if (h2 < 3) suggestions.push('Add more H2 headings to structure content');
+      if (keywordDensity < 1 && keywordList.length > 0) suggestions.push('Keyword density is low — consider using keywords more naturally');
+      if (keywordDensity > 5) suggestions.push('Keyword density is too high — avoid over-optimization');
+      if (content.length < 500) suggestions.push('Article is short — aim for 800+ words for better SEO');
+      if (suggestions.length === 0) suggestions.push('Content is well-structured for SEO');
 
       // Score
       let score = 50;

@@ -6,7 +6,7 @@ import { initChatModel } from 'langchain';
 
 type Model = Awaited<ReturnType<typeof initChatModel>>;
 
-const DEFAULT_MODEL = '@makers/deepseek-v4-flash';
+const DEFAULT_MODEL = 'openai/gpt-4o-mini';
 
 export interface AgentEnv {
     AI_GATEWAY_API_KEY: string;
@@ -14,16 +14,22 @@ export interface AgentEnv {
     AI_GATEWAY_MODEL?: string;
 }
 
-/** Extract and validate required environment variables. */
+/** Extract and validate required environment variables. Supports AI_GATEWAY_* and SERVICE_* aliases and OpenRouter defaults. */
 export function getAgentEnv(contextEnv: Record<string, string | undefined> | undefined): AgentEnv {
     const source = contextEnv ?? {};
-    const required = ['AI_GATEWAY_API_KEY', 'AI_GATEWAY_BASE_URL'] as const;
-    const missing = required.filter((k) => !source[k]?.trim());
+    // Support both AI_GATEWAY_* and SERVICE_* aliases (backward compatibility with EdgeOne)
+    const apiKey = (source.AI_GATEWAY_API_KEY || source.SERVICE_API_KEY || '').trim();
+    const baseUrl = (source.AI_GATEWAY_BASE_URL || source.SERVICE_BASE_URL || '').trim();
+    const model = (source.AI_GATEWAY_MODEL || source.SERVICE_MODEL || '').trim();
+
+    const missing: string[] = [];
+    if (!apiKey) missing.push('AI_GATEWAY_API_KEY');
+    if (!baseUrl) missing.push('AI_GATEWAY_BASE_URL');
     if (missing.length) throw new Error(`Missing environment variables: ${missing.join(', ')}`);
     return {
-        AI_GATEWAY_API_KEY: source.AI_GATEWAY_API_KEY!,
-        AI_GATEWAY_BASE_URL: source.AI_GATEWAY_BASE_URL!,
-        AI_GATEWAY_MODEL: source.AI_GATEWAY_MODEL,
+        AI_GATEWAY_API_KEY: apiKey,
+        AI_GATEWAY_BASE_URL: baseUrl,
+        AI_GATEWAY_MODEL: model || undefined,
     };
 }
 
@@ -60,8 +66,8 @@ export function createLogger(name: string) {
 }
 
 // ─── SSE Helpers ───
-// SOP D 段要求："Use the shared createSSEResponse helper instead of inlining a
-// ReadableStream per file"。所有 agent 端点统一走这个 helper。
+// SOP D: "Use the shared createSSEResponse helper instead of inlining a
+// ReadableStream per file". All agent endpoints share this helper.
 
 export function sseEvent(data: Record<string, unknown>): string {
     return `data: ${JSON.stringify(data)}\n\n`;

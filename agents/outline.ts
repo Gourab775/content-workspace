@@ -33,7 +33,8 @@ RULES:
 - Headings should be specific and engaging
 - The outline should tell a coherent story
 - Match the tone to the requested style
-- Target word counts: short=1000 Chinese chars/800 English words, medium=2500 Chinese chars/2000 English words, long=5000 Chinese chars/4000 English words
+- Target word counts: short=800 words, medium=2000 words, long=4000 words
+- All content MUST be in English only
 - Output ONLY valid JSON, no markdown fences or extra text`;
 
 export async function onRequest(context: any) {
@@ -54,8 +55,8 @@ export async function onRequest(context: any) {
             `Topic: "${topic}"`,
             keywords ? `Keywords: ${keywords}` : '',
             `Style: ${style || 'informative'}`,
-            `Target length: ${length || 'medium'} (short=1000字/800words, medium=2500字/2000words, long=5000字/4000words)`,
-            `Language: Write in the same language as the topic`,
+            `Target length: ${length || 'medium'} (short=800 words, medium=2000 words, long=4000 words)`,
+            `Language: Write the outline in English only`,
         ].filter(Boolean).join('\n');
 
         logger.log(`Generating outline for: "${topic}"`);

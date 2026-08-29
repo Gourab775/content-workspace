@@ -7,11 +7,11 @@ import { getAgentEnv, createModel, createLogger } from './_shared';
 
 const logger = createLogger('suggest-keywords');
 
-const SYSTEM_PROMPT = `You are an SEO keyword expert. Given an article topic, suggest 3-5 highly relevant keywords or short phrases for SEO optimization.
+const SYSTEM_PROMPT = `You are an SEO keyword expert for English content. Given an article topic, suggest 3-5 highly relevant English keywords or short phrases for SEO optimization.
 
 RULES:
 - Output ONLY the keywords separated by commas (e.g., "keyword1, keyword2, keyword3")
-- Use the same language as the topic
+- Output MUST be in English only — translate the topic if needed
 - Keywords should be specific and relevant to the topic
 - Include a mix of broad and long-tail keywords
 - Do NOT output any explanation, numbering, or extra text`;

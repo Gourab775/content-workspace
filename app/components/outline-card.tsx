@@ -88,7 +88,7 @@ export function OutlineCard({
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
           </svg>
           <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
-            {(t as any).outlineReady ?? "大纲已生成，请确认或调整"}
+            {(t as any).outlineReady ?? "Outline ready — review and confirm"}
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -97,7 +97,7 @@ export function OutlineCard({
             disabled={isLoading}
             onClick={onDismiss}
           >
-            {(t as any).skipOutline ?? "跳过"}
+            {(t as any).skipOutline ?? "Skip"}
           </button>
           <Button
             variant="secondary"
@@ -108,7 +108,7 @@ export function OutlineCard({
             <svg className="mr-1 h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            {(t as any).regenerateOutline ?? "重新生成"}
+            {(t as any).regenerateOutline ?? "Regenerate"}
           </Button>
           <Button
             size="sm"
@@ -118,7 +118,7 @@ export function OutlineCard({
             <svg className="mr-1 h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-            {(t as any).confirmOutline ?? "确认并开始写作"}
+            {(t as any).confirmOutline ?? "Confirm & Start Writing"}
           </Button>
         </div>
       </div>
@@ -194,7 +194,7 @@ export function OutlineCard({
                     <input
                       className="flex-1 bg-transparent text-xs text-gray-600 dark:text-gray-400 focus:outline-none focus:text-gray-900 dark:focus:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-gray-600"
                       value={point}
-                      placeholder="输入要点..."
+                      placeholder="Enter key point..."
                       onChange={(e) => updateKeyPoint(si, pi, e.target.value)}
                     />
                     <button
@@ -213,14 +213,14 @@ export function OutlineCard({
                     className="mt-1 text-xs text-brand-500 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
                     onClick={() => addKeyPoint(si)}
                   >
-                    + 添加要点
+                    + Add point
                   </button>
                 </li>
               </ul>
 
               {section.estimatedWords && (
                 <p className="ml-7 text-xs text-gray-400 dark:text-gray-600">
-                  ~{section.estimatedWords} 字
+                  ~{section.estimatedWords} words
                 </p>
               )}
             </li>
@@ -229,7 +229,7 @@ export function OutlineCard({
 
         {editedOutline.estimatedTotalWords && (
           <p className="text-right text-xs text-gray-400 dark:text-gray-500">
-            {(t as any).estimatedWords ?? "预计总字数"}：~{editedOutline.estimatedTotalWords} 字
+            {(t as any).estimatedWords ?? "Estimated words"}: ~{editedOutline.estimatedTotalWords} words
           </p>
         )}
       </div>
