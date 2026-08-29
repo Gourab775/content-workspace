@@ -105,9 +105,16 @@ export function ArticleHistory({
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || data?.error === 'BLOB_NOT_CONFIGURED') {
+        // storage unavailable — keep local cache silently, no warning
         setBlobError('BLOB_NOT_CONFIGURED');
-        setArticles([]);
-        clearCache();
+        const cached = readCache();
+        if (cached && cached.data.length > 0) {
+          setArticles(cached.data);
+        } else if (!silent) {
+          // only clear if no cache and not silent
+          setArticles([]);
+        }
+        // do not clear cache — preserve local history
       } else {
         setBlobError(null);
         const list: ArticleRecord[] = data?.articles || [];
@@ -165,7 +172,40 @@ export function ArticleHistory({
               const errData = await res.json().catch(() => null);
               if (errData?.error === 'BLOB_NOT_CONFIGURED') {
                 setBlobError('BLOB_NOT_CONFIGURED');
-                clearCache();
+                // local cache fallback — append version locally
+                const wordCount = currentContent.split(/\s+/).filter(Boolean).length;
+                const newVersion: ArticleVersion = { content: currentContent, createdAt: new Date().toISOString(), wordCount };
+                setArticles((prev) => {
+                  const idx = prev.findIndex((a) => a.id === currentArticleId);
+                  if (idx >= 0) {
+                    const copy = [...prev];
+                    const art = { ...copy[idx], versions: [...(copy[idx].versions || []), newVersion], wordCount };
+                    copy[idx] = art;
+                    writeCache(copy);
+                    // notify parent with updated versions
+                    setTimeout(() => onAutoSaved(currentArticleId, art.versions), 0);
+                    return copy;
+                  }
+                  // fallback: treat as new local article if not found
+                  const localId = currentArticleId || `local-${Date.now()}`;
+                  const localArt: ArticleRecord = {
+                    id: localId,
+                    title,
+                    keywords: currentKeywords,
+                    style: currentStyle,
+                    createdAt: new Date().toISOString(),
+                    wordCount,
+                    versions: [newVersion],
+                    currentVersion: 0,
+                  };
+                  const next = [localArt, ...prev];
+                  writeCache(next);
+                  setTimeout(() => onAutoSaved(localId, [newVersion]), 0);
+                  return next;
+                });
+                setSavedToast(true);
+                setTimeout(() => setSavedToast(false), 2000);
+                return;
               } else {
                 onSaveError?.(errData?.message || `Save failed (${res.status})`);
               }
@@ -176,8 +216,22 @@ export function ArticleHistory({
             const data = await res.json();
             if (data.error === 'BLOB_NOT_CONFIGURED') {
               setBlobError('BLOB_NOT_CONFIGURED');
-              clearCache();
-              onAutoSaved(currentArticleId, []);
+              const wordCount = currentContent.split(/\s+/).filter(Boolean).length;
+              const newVersion: ArticleVersion = { content: currentContent, createdAt: new Date().toISOString(), wordCount };
+              setArticles((prev) => {
+                const idx = prev.findIndex((a) => a.id === currentArticleId);
+                if (idx >= 0) {
+                  const copy = [...prev];
+                  const art = { ...copy[idx], versions: [...(copy[idx].versions || []), newVersion], wordCount };
+                  copy[idx] = art;
+                  writeCache(copy);
+                  setTimeout(() => onAutoSaved(currentArticleId, art.versions), 0);
+                  return copy;
+                }
+                return prev;
+              });
+              setSavedToast(true);
+              setTimeout(() => setSavedToast(false), 2000);
               return;
             }
 
@@ -210,7 +264,29 @@ export function ArticleHistory({
               const errData = await res.json().catch(() => null);
               if (errData?.error === 'BLOB_NOT_CONFIGURED') {
                 setBlobError('BLOB_NOT_CONFIGURED');
-                clearCache();
+                // local cache fallback — create new article locally
+                const wordCount = currentContent.split(/\s+/).filter(Boolean).length;
+                const newVersion: ArticleVersion = { content: currentContent, createdAt: new Date().toISOString(), wordCount };
+                const localId = `local-${Date.now()}`;
+                const localArt: ArticleRecord = {
+                  id: localId,
+                  title,
+                  keywords: currentKeywords,
+                  style: currentStyle,
+                  createdAt: new Date().toISOString(),
+                  wordCount,
+                  versions: [newVersion],
+                  currentVersion: 0,
+                };
+                setArticles((prev) => {
+                  const next = [localArt, ...prev];
+                  writeCache(next);
+                  return next;
+                });
+                setSavedToast(true);
+                setTimeout(() => setSavedToast(false), 2000);
+                onAutoSaved(localId, [newVersion]);
+                return;
               } else {
                 onSaveError?.(errData?.message || `Save failed (${res.status})`);
               }
@@ -221,8 +297,27 @@ export function ArticleHistory({
             const data = await res.json();
             if (data.error === 'BLOB_NOT_CONFIGURED') {
               setBlobError('BLOB_NOT_CONFIGURED');
-              clearCache();
-              onAutoSaved('', []);
+              const wordCount = currentContent.split(/\s+/).filter(Boolean).length;
+              const newVersion: ArticleVersion = { content: currentContent, createdAt: new Date().toISOString(), wordCount };
+              const localId = `local-${Date.now()}`;
+              const localArt: ArticleRecord = {
+                id: localId,
+                title,
+                keywords: currentKeywords,
+                style: currentStyle,
+                createdAt: new Date().toISOString(),
+                wordCount,
+                versions: [newVersion],
+                currentVersion: 0,
+              };
+              setArticles((prev) => {
+                const next = [localArt, ...prev];
+                writeCache(next);
+                return next;
+              });
+              setSavedToast(true);
+              setTimeout(() => setSavedToast(false), 2000);
+              onAutoSaved(localId, [newVersion]);
               return;
             }
 
@@ -329,11 +424,6 @@ export function ArticleHistory({
             </svg>
             <span className="text-xs text-gray-400">Loading…</span>
           </div>
-        ) : blobError ? (
-          <div className="py-4 px-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-            <p className="text-xs font-medium text-amber-700 dark:text-amber-400">{t.blobNotConfigured}</p>
-            <p className="text-[11px] text-amber-600/80 dark:text-amber-400/70 mt-1">History is cached locally for this session and will sync when storage is available.</p>
-          </div>
         ) : articles.length === 0 ? (
           <p className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">{t.noHistory}</p>
         ) : (
@@ -385,10 +475,6 @@ export function ArticleHistory({
               </li>
             ))}
           </ul>
-        )}
-        {/* subtle cache hint */}
-        {!isLoading && !blobError && articles.length > 0 && (
-          <p className="mt-2 text-center text-[10px] text-gray-400 dark:text-gray-500">Cached locally · refreshes every 5 min</p>
         )}
       </CardContent>
     </Card>

@@ -78,7 +78,6 @@ function HomeInner() {
 
   // Preferences & notifications
   const [preferences, setPreferences] = useState<any>(null);
-  const [storageWarning, setStorageWarning] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'error' | 'success' } | null>(null);
 
@@ -97,9 +96,7 @@ function HomeInner() {
         if (data?.preferences) {
           setPreferences(data.preferences);
         }
-        if (data?.error === 'BLOB_NOT_CONFIGURED') {
-          setStorageWarning(true);
-        }
+        // storage warning deliberately suppressed — history now uses local cache
       })
       .catch(() => {});
   }, []);
@@ -550,17 +547,6 @@ function HomeInner() {
       </header>
 
       {/* Main layout */}
-      {storageWarning && (
-        <div className="mx-auto max-w-[1600px] px-4 pt-4">
-          <div className="flex items-start gap-2 px-4 py-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-            <span className="text-amber-500 mt-0.5">⚠️</span>
-            <div className="flex-1">
-              <p className="text-xs text-amber-700 dark:text-amber-400">{t.blobNotConfigured}</p>
-            </div>
-            <button onClick={() => setStorageWarning(false)} className="text-amber-400 hover:text-amber-600 text-sm leading-none">×</button>
-          </div>
-        </div>
-      )}
       {apiError && (
         <div className="mx-auto max-w-[1600px] px-4 pt-4">
           <div className="flex items-start gap-2 px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
