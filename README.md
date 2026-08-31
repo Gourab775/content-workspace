@@ -1,4 +1,4 @@
-﻿# Content Creator Studio
+# Content Creator Studio
 
 Professional full-stack workspace for research-driven content development, structured outlining, streaming publishing, and search optimization with persistent preferences and versioned history.
 
